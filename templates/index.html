@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #fafaf8;
+      color: #1a1a18;
+      font-family: 'Lora', Georgia, serif;
+      font-size: 17px;
+      line-height: 1.75;
+      padding: 0 1rem;
+    }
+
+    header, main, footer { max-width: 680px; margin: 0 auto; }
+
+    header {
+      padding: 2rem 0 1.5rem;
+      border-bottom: 1px solid #e0dfd8;
+      display: flex;
+      align-items: baseline;
+      gap: 2rem;
+    }
+
+    .site-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1rem;
+      font-weight: 500;
+      color: #1a1a18;
+      text-decoration: none;
+    }
+
+    nav a {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      color: #6b6b65;
+      text-decoration: none;
+    }
+
+    nav a:hover { color: #1a1a18; }
+
+    h1 {
+      font-size: 1.9rem;
+      font-weight: 600;
+      line-height: 1.25;
+      letter-spacing: -0.02em;
+      margin-bottom: 2.5rem;
+    }
+
+    main { padding: 3.5rem 0 4rem; }
+
+    p  { margin-bottom: 1.2rem; }
+    h2 { font-size: 1.15rem; font-weight: 600; margin: 2.5rem 0 0.75rem; }
+
+    ul, ol {
+      padding-left: 1.5rem;
+      margin-bottom: 1.2rem;
+    }
+
+    li {
+      margin-bottom: 0.3rem;
+    }
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82em;
+      background: #f0efeb;
+      padding: 0.1em 0.35em;
+      border-radius: 3px;
+    }
+
+    pre {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      background: #f0efeb;
+      border-left: 3px solid #2d6a4f;
+      padding: 1rem 1.2rem;
+      overflow-x: auto;
+      margin: 1.4rem 0;
+    }
+
+    pre code { background: none; padding: 0; }
+
+    blockquote {
+      border-left: 3px solid #e0dfd8;
+      margin: 1.4rem 0;
+      padding: 0.3rem 0 0.3rem 1.2rem;
+      color: #6b6b65;
+      font-style: italic;
+    }
+
+    .note {
+      background: #f0efeb;
+      border-left: 3px solid #2d6a4f;
+      padding: 0.8rem 1.1rem;
+      margin: 1.4rem 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
+      line-height: 1.6;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid #e0dfd8;
+      margin: 2.5rem 0;
+    }
+
+    footer {
+      border-top: 1px solid #e0dfd8;
+      padding: 1.5rem 0 2.5rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.73rem;
+      color: #6b6b65;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <a class="site-name" href="/">mysite.io</a>
+  <nav>
+    <a href="/posts/">Posts</a>
+  </nav>
+</header>
+
+<main>
+  <article>
+    <h1>Home</h1>
+
+    <article>
+<!-- .md formatted to .html by steven-na -->
+<h1>Heading Level 1</h1>
+
+<h2>Heading Level 2</h2>
+
+<h3>Heading Level 3</h3>
+
+<hr>
+
+<h2>Basic Inline Formatting</h2>
+
+<p>This is <strong>bold with double asterisks</strong> and <strong>bold with double underscores</strong>.</p>
+<p>This is <em>italic with single asterisk</em> and <em>italic with single underscore</em>.</p>
+<p>This is <strong>bold and <em>nested italic</em> inside bold</strong>.</p>
+<p>This is <em>italic and <strong>nested bold</strong> inside italic</em>.</p>
+
+<p>Escaped formatting: *not italic* and **not bold** and _not italic_.</p>
+
+<hr>
+
+<h2>Code</h2>
+
+<p>Inline <code>code snippet</code> in a sentence.</p>
+<p>Another inline <code>const x = 42;</code> example.</p>
+
+<pre><code>function greet(name) {
+    return "Hello, " + name + "!";
+}
+console.log(greet("world"));
+</code></pre>
+
+<hr>
+
+<h2>Blockquotes</h2>
+
+<blockquote>This is a simple blockquote.</blockquote>
+
+<blockquote>This blockquote contains <strong>bold</strong> and <em>italic</em> and <code>inline code</code> inside it.</blockquote>
+
+<hr>
+
+<h2>Links</h2>
+
+<p><a href="https://example.com">Simple link</a></p>
+<p><a href="https://example.com/some/deep/path?query=value&other=123">Link with path</a></p>
+<p><a href="https://openai.com">Another link</a></p>
+
+<hr>
+
+<h2>Images</h2>
+
+<img src="https://cataas.com/cat?type=square" alt="A random cat">
+<img src="https://cataas.com/cat?width=200&height=200" alt="Another cat">
+
+<hr>
+
+<h2>Edge Cases</h2>
+
+<p><strong>Bold at start of line</strong></p>
+<p><em>Italic at start of line</em></p>
+<p>Line ending in bold <strong>bold end</strong></p>
+<p>Line ending in italic <em>italic end</em></p>
+
+<p>Two <strong>bold</strong> words <strong>in one</strong> line.</p>
+<p>Two <em>italic</em> words <em>in one</em> line.</p>
+<p>Mix of <strong>bold</strong> and <em>italic</em> and <code>code</code> all in one sentence.</p>
+
+<p>A line with a <a href="https://example.com">link</a> embedded mid-sentence, not at start.</p>
+
+<p>Empty brackets edge: []() should produce an empty anchor.</p>
+
+<hr>
+
+<h2>Adjacent Formatting</h2>
+
+<p><strong>bold</strong><em>italic</em> right next to each other.</p>
+<p><code>code</code><strong>bold</strong> no space between.</p>
+
+<hr>
+
+<h2>Horizontal Rules</h2>
+
+<p>Before rule.</p>
+
+<hr>
+
+<p>After rule. Another one coming.</p>
+
+<hr>
+
+<p>Done.</p>
+
+<hr>
+
+<h2>Deeply Nested Content</h2>
+
+<blockquote>Blockquote with <strong>bold</strong>, <em>italic</em>, <code>code</code>, and a <a href="https://example.com">link</a> all inside.</blockquote>
+
+<hr>
+
+<h2>Repeated Patterns</h2>
+
+<p><strong>one</strong> <strong>two</strong> <strong>three</strong></p>
+<p><em>one</em> <em>two</em> <em>three</em></p>
+<p><code>one</code> <code>two</code> <code>three</code></p>
+<p><a href="https://a.com">a</a> <a href="https://b.com">b</a> <a href="https://c.com">c</a></p>
+
+<hr>
+
+<h2>Long Line</h2>
+
+<p>This is a very long line with <strong>bold text appearing multiple times</strong>, and also <em>italic text appearing multiple times</em>, and some <code>inline code blocks</code> scattered throughout, plus a <a href="https://example.com">hyperlink to example</a> somewhere in the middle, and it just keeps going with more <strong>bold</strong> and more <em>italic</em> until it finally ends.</p>
+
+<hr>
+
+<h2>Images Mixed with Links</h2>
+
+<img src="https://cataas.com/cat?1" alt="Image one">
+<p><a href="https://example.com">Link after image</a></p>
+<img src="https://cataas.com/cat?2" alt="Image two">
+<p><a href="https://example.org">Another link</a></p>
+
+<p></p>
+      </article>
+</main>
+
+<footer></footer>
+
+</body>
+</html>
