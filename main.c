@@ -1,6 +1,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -45,28 +46,58 @@ i32 read_html_in(char **html_buffer, char *filename) {
     return lSize + 1;
 }
 
-i32 index_endpoint(char **resp_buffer) {
-    char *html_content;
-    i32 lSize = read_html_in(&html_content, "./templates/index.html");
-    if (lSize == -1) {
-        perror("file read");
+i32 replace_text(char *haystack, const char *needle, const char *replace) {
+    size_t haystackLen = strlen(haystack);
+    char *pos = strstr(haystack, needle);
+    if (!pos) {
         return -1;
     }
+    i32 offset = pos - haystack;
 
+    size_t ndlLen = strlen(needle);
+    size_t repLen = strlen(replace);
+    size_t tailLen = haystackLen - offset - ndlLen;
+
+    if (repLen > ndlLen) {
+        haystack = realloc(haystack, haystackLen + (repLen - ndlLen) + 1);
+        pos = haystack + offset;
+    }
+    memmove(pos + repLen, pos + ndlLen, tailLen);
+    memcpy(pos, replace, repLen);
+    haystackLen += (repLen - ndlLen);
+    return haystackLen;
+}
+
+i32 build_response(char **resp_buffer, char *html_content, i32 html_size) {
     const char resp[] = "HTTP/1.0 200 OK\r\n"
                         "Content-type: text/html\r\n\r\n";
 
-    *resp_buffer = calloc(1, strlen(resp) + lSize + 1);
+    *resp_buffer = calloc(1, strlen(resp) + html_size + 1);
     if (!*resp_buffer) {
         free(html_content);
         perror("memory alloc fails");
         return -1;
     }
     strcpy(*resp_buffer, resp);
-    memcpy(*resp_buffer + strlen(resp), html_content, lSize);
+    memcpy(*resp_buffer + strlen(resp), html_content, html_size);
     free(html_content);
-    return strlen(resp) + lSize + 1;
-};
+    return strlen(resp) + html_size + 1;
+}
+
+i32 index_endpoint(char **resp_buffer) {
+    char *html_content;
+    i32 lSize = read_html_in(&html_content, "./pages/index.html");
+    if (lSize == -1) {
+        perror("file read");
+        return -1;
+    }
+
+    i32 result = build_response(resp_buffer, html_content, lSize);
+    if (result == -1) {
+        return -1;
+    }
+    return result;
+}
 
 i32 post_endpoint(char **resp_buffer) {
     char *html_content;
@@ -76,21 +107,20 @@ i32 post_endpoint(char **resp_buffer) {
         return -1;
     }
 
-    const char resp[] = "HTTP/1.0 200 OK\r\n"
-                        "Server: webserver-c\r\n"
-                        "Content-type: text/html\r\n\r\n";
+    lSize = replace_text(html_content, "<!-- ARTICLE TITLE -->", "Test Title");
+    lSize = replace_text(html_content, "<!-- ARTICLE TITLE -->", "Test Title");
+    lSize =
+        replace_text(html_content, "<!-- ARTICLE AUTHOR -->", "Test Author");
+    lSize = replace_text(html_content, "<!-- ARTICLE DATE -->", "Jan 1, 2000");
+    lSize = replace_text(html_content, "<!-- ARTICLE CONTENT -->",
+                         "<p>Test Content</p>\n");
 
-    *resp_buffer = calloc(1, strlen(resp) + lSize + 1);
-    if (!*resp_buffer) {
-        free(html_content);
-        perror("memory alloc fails");
+    i32 result = build_response(resp_buffer, html_content, lSize);
+    if (result == -1) {
         return -1;
     }
-    strcpy(*resp_buffer, resp);
-    memcpy(*resp_buffer + strlen(resp), html_content, lSize);
-    free(html_content);
-    return strlen(resp) + lSize + 1;
-};
+    return result;
+}
 
 i32 not_found_endpoint(char **resp_buffer) {
     char *html_content;
@@ -100,8 +130,7 @@ i32 not_found_endpoint(char **resp_buffer) {
         return -1;
     }
 
-    const char resp[] = "HTTP/1.0 200 OK\r\n"
-                        "Server: webserver-c\r\n"
+    const char resp[] = "HTTP/1.0 404 Not Found\r\n"
                         "Content-type: text/html\r\n\r\n";
 
     *resp_buffer = calloc(1, strlen(resp) + lSize + 1);
