@@ -187,6 +187,7 @@ int main() {
 
         char *endpoint_resp;
         i32 resp_len = 0;
+        i32 should_free = 0;
 
         if (strcmp(uri, "/") == 0) {
             endpoint_resp = "HTTP/1.0 301 Moved Permanently\r\n"
@@ -200,12 +201,14 @@ int main() {
                             strlen(endpoints[i].endpoint)) == 0) {
                     resp_len = endpoints[i].func(&endpoint_resp);
                     printf("%i\n", resp_len);
+                    should_free = 1;
                     break;
                 }
             }
         }
         if (resp_len == 0) {
             resp_len = nf_endpoint(&endpoint_resp);
+            should_free = 1;
         }
 
         if (write(newsockfd, endpoint_resp, resp_len) < 0) {
@@ -213,7 +216,9 @@ int main() {
             continue;
         }
 
-        free(endpoint_resp);
+        if (should_free) {
+            free(endpoint_resp);
+        }
 
         printf("server accepted connection\n");
 
