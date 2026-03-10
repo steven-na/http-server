@@ -351,6 +351,59 @@
       height: 12px;
       fill: currentColor;
     }
+
+    /* ── Post navigation ── */
+    .post-nav {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2.5rem 0;
+      border-top: 1px solid var(--border);
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .post-nav-link {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      text-decoration: none;
+      padding: 1rem 1.1rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .post-nav-link:hover {
+      border-color: var(--fg);
+      background: var(--code-bg);
+    }
+
+    .post-nav-link.prev { align-items: flex-start; }
+    .post-nav-link.next { align-items: flex-end; grid-column: 2; }
+
+    .post-nav-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .post-nav-label svg {
+      width: 10px;
+      height: 10px;
+      fill: currentColor;
+      flex-shrink: 0;
+    }
+
+    .post-nav-title {
+      font-family: 'Lora', Georgia, serif;
+      font-size: 0.9rem;
+      color: var(--fg);
+      line-height: 1.35;
+    }
   </style>
 </head>
 <body>
@@ -387,6 +440,34 @@
     <!-- ARTICLE CONTENT -->
   </article>
 </main>
+
+<nav class="post-nav" aria-label="Post navigation">
+  <!-- PREVIOUS POST — replace href and title, or remove this block if no previous post -->
+  <!-- REMOVE PREV POST START -->
+  <a class="post-nav-link prev" href="/posts/PREVIOUS-POST-SLUG">
+    <span class="post-nav-label">
+      <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+        <path fill-rule="evenodd" d="M15 8a.5.5 0 0 0-.5-.5H2.707l3.147-3.146a.5.5 0 1 0-.708-.708l-4 4a.5.5 0 0 0 0 .708l4 4a.5.5 0 0 0 .708-.708L2.707 8.5H14.5A.5.5 0 0 0 15 8z"/>
+      </svg>
+      previous post
+    </span>
+    <span class="post-nav-title"><!-- PREVIOUS POST TITLE --></span>
+  </a>
+  <!-- REMOVE PREV POST END -->
+
+  <!-- NEXT POST — replace href and title, or remove this block if no next post -->
+  <!-- REMOVE NEXT POST START -->
+  <a class="post-nav-link next" href="/posts/NEXT-POST-SLUG">
+    <span class="post-nav-label">
+      next post
+      <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+        <path fill-rule="evenodd" d="M1 8a.5.5 0 0 1 .5-.5h11.793l-3.147-3.146a.5.5 0 0 1 .708-.708l4 4a.5.5 0 0 1 0 .708l-4 4a.5.5 0 0 1-.708-.708L13.293 8.5H1.5A.5.5 0 0 1 1 8z"/>
+      </svg>
+    </span>
+    <span class="post-nav-title"><!-- NEXT POST TITLE --></span>
+  </a>
+  <!-- REMOVE NEXT POST END -->
+</nav>
 
 <footer>
   <div class="footer-left">

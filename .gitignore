@@ -1,4 +1,3 @@
 main
-posts/*.html
-posts/*.txt
-/posts/test_post
+posts/*
+!posts/posts.txt.example

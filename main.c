@@ -191,41 +191,26 @@ i32 build_response(char **resp_buffer, char *html_content, i32 html_size) {
 }
 
 i32 recent_post_endpoint(char **resp_buffer, char *params) {
-    char *html_content;
-    i32 lSize = read_file_in(&html_content, "./templates/post.html");
-    if (lSize == -1) {
-        perror("file read");
-        return 0;
-    }
-
     post *posts_list = NULL; // initialize to NULL
     i32 post_count = get_posts_list(&posts_list);
     if (post_count <= 0 || !posts_list) {
         return 0;
     }
     const post *p = &posts_list[post_count - 1];
-
-    char *post_body;
-    char *full_path;
-    asprintf(&full_path, "./posts/%s", p->fileName);
-    i32 post_size = read_file_in(&post_body, full_path);
-    free(full_path);
-    if (post_size == -1) {
-        return 0;
-    }
-
-    replace_all_text(&html_content, "<!-- ARTICLE TITLE -->", p->title);
-    replace_text(&html_content, "<!-- ARTICLE AUTHOR -->", p->author);
-    replace_text(&html_content, "<!-- ARTICLE DATE -->", p->date);
-    replace_text(&html_content, "<!-- ARTICLE CONTENT -->", post_body);
-
-    i32 result =
-        build_response(resp_buffer, html_content, strlen(html_content));
-    if (result == -1) {
+    char endpoint_resp[] = "HTTP/1.0 301 Moved Permanently\r\n"
+                           "Location: /posts/%s\r\n";
+    char *redirect_resp;
+    asprintf(&redirect_resp, endpoint_resp, p->fileName);
+    *resp_buffer = calloc(1, strlen(redirect_resp) + 1);
+    if (!*resp_buffer) {
+        free(redirect_resp);
+        perror("memory alloc fails");
         return -1;
     }
-    return result;
+    strcpy(*resp_buffer, redirect_resp);
+    return strlen(*resp_buffer) + 1;
 }
+
 i32 specific_post_endpoint(char **resp_buffer, char *params) {
     char *html_content;
     i32 lSize = read_file_in(&html_content, "./templates/post.html");
@@ -240,9 +225,10 @@ i32 specific_post_endpoint(char **resp_buffer, char *params) {
         return 0;
     }
     const post *p = NULL;
-    for (int i = 0; i < post_count; i++) {
-        if (strcmp(posts_list[i].fileName, params) == 0) {
-            p = &posts_list[i];
+    int postindex;
+    for (postindex = 0; postindex < post_count; postindex++) {
+        if (strcmp(posts_list[postindex].fileName, params) == 0) {
+            p = &posts_list[postindex];
             break;
         }
     }
