@@ -1,6 +1,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -50,7 +51,7 @@ i32 replace_text(char *haystack, const char *needle, const char *replace) {
     size_t haystackLen = strlen(haystack);
     char *pos = strstr(haystack, needle);
     if (!pos) {
-        return -1;
+        return 0;
     }
     i32 offset = pos - haystack;
 
@@ -84,7 +85,7 @@ i32 build_response(char **resp_buffer, char *html_content, i32 html_size) {
     return strlen(resp) + html_size + 1;
 }
 
-i32 index_endpoint(char **resp_buffer) {
+i32 index_endpoint(char **resp_buffer, char *params) {
     char *html_content;
     i32 lSize = read_html_in(&html_content, "./pages/index.html");
     if (lSize == -1) {
@@ -99,7 +100,7 @@ i32 index_endpoint(char **resp_buffer) {
     return result;
 }
 
-i32 post_endpoint(char **resp_buffer) {
+i32 recent_post_endpoint(char **resp_buffer, char *params) {
     char *html_content;
     i32 lSize = read_html_in(&html_content, "./templates/post.html");
     if (lSize == -1) {
@@ -107,11 +108,12 @@ i32 post_endpoint(char **resp_buffer) {
         return -1;
     }
 
-    lSize = replace_text(html_content, "<!-- ARTICLE TITLE -->", "Test Title");
-    lSize = replace_text(html_content, "<!-- ARTICLE TITLE -->", "Test Title");
-    lSize =
-        replace_text(html_content, "<!-- ARTICLE AUTHOR -->", "Test Author");
-    lSize = replace_text(html_content, "<!-- ARTICLE DATE -->", "Jan 1, 2000");
+    // lSize = replace_text(html_content, "<!-- ARTICLE TITLE -->", "Test
+    // Title"); lSize = replace_text(html_content, "<!-- ARTICLE TITLE -->",
+    // "Test Title"); lSize =
+    //     replace_text(html_content, "<!-- ARTICLE AUTHOR -->", "Test Author");
+    // lSize = replace_text(html_content, "<!-- ARTICLE DATE -->", "Jan 1,
+    // 2000");
     lSize = replace_text(html_content, "<!-- ARTICLE CONTENT -->",
                          "<p>Test Content</p>\n");
 
@@ -122,9 +124,35 @@ i32 post_endpoint(char **resp_buffer) {
     return result;
 }
 
+i32 specific_post_endpoint(char **resp_buffer, char *params) {
+    char *html_content;
+    i32 lSize = read_html_in(&html_content, "./templates/post.html");
+    if (lSize == -1) {
+        perror("file read");
+        return -1;
+    }
+
+    i32 p = 1;
+    // TODO: each replace is adding "dy>" or something similar to the html
+    p *= replace_text(html_content, "<!-- ARTICLE TITLE -->", "Test Title");
+    p *= replace_text(html_content, "<!-- ARTICLE TITLE -->", "Test Title");
+    p *= replace_text(html_content, "<!-- ARTICLE AUTHOR -->", "Test Author");
+    p *= replace_text(html_content, "<!-- ARTICLE DATE -->", "Jan 1, 2000");
+    // p *= replace_text(html_content, "<!-- ARTICLE CONTENT -->", params);
+
+    printf("\n%i\n", p);
+
+    i32 result =
+        build_response(resp_buffer, html_content, strlen(html_content));
+    if (result == -1) {
+        return -1;
+    }
+    return result;
+}
+
 i32 not_found_endpoint(char **resp_buffer) {
     char *html_content;
-    i32 lSize = read_html_in(&html_content, "./templates/404.html");
+    i32 lSize = read_html_in(&html_content, "./pages/404.html");
     if (lSize == -1) {
         perror("file read");
         return -1;
@@ -147,7 +175,8 @@ i32 not_found_endpoint(char **resp_buffer) {
 
 typedef struct {
     char *endpoint;
-    i32 (*func)(char **);
+    i32 (*func)(char **, char *);
+    bool is_prefix;
 } endpoint_mapping;
 
 int main() {
@@ -181,12 +210,16 @@ int main() {
     printf("server listening for connectons...\n");
     char read_buffer[BUFFER_SIZE];
 
-    u8 endpoint_count = 2;
+    u8 endpoint_count = 3;
     endpoint_mapping endpoints[endpoint_count];
-    endpoints[0] =
-        (endpoint_mapping){.endpoint = "/posts/", .func = post_endpoint};
-    endpoints[1] =
-        (endpoint_mapping){.endpoint = "/home", .func = index_endpoint};
+    endpoints[0] = (endpoint_mapping){.endpoint = "/posts/recent",
+                                      .func = recent_post_endpoint,
+                                      .is_prefix = false};
+    endpoints[1] = (endpoint_mapping){.endpoint = "/posts/",
+                                      .func = specific_post_endpoint,
+                                      .is_prefix = true};
+    endpoints[2] =
+        (endpoint_mapping){.endpoint = "/home/", .func = index_endpoint};
     i32 (*nf_endpoint)(char **) = not_found_endpoint;
 
     for (;;) {
@@ -226,12 +259,20 @@ int main() {
             for (u8 i = 0; i < endpoint_count; i++) {
                 printf("strncmp:%i\n", strncmp(uri, endpoints[i].endpoint,
                                                strlen(endpoints[i].endpoint)));
-                if (strncmp(uri, endpoints[i].endpoint,
-                            strlen(endpoints[i].endpoint)) == 0) {
-                    resp_len = endpoints[i].func(&endpoint_resp);
-                    printf("%i\n", resp_len);
-                    should_free = 1;
-                    break;
+                if (endpoints[i].is_prefix) {
+                    if (strncmp(uri, endpoints[i].endpoint,
+                                strlen(endpoints[i].endpoint)) == 0) {
+                        char *p = uri + strlen(endpoints[i].endpoint);
+                        resp_len = endpoints[i].func(&endpoint_resp, p);
+                        should_free = 1;
+                        break;
+                    }
+                } else {
+                    if (strcmp(uri, endpoints[i].endpoint) == 0) {
+                        resp_len = endpoints[i].func(&endpoint_resp, "");
+                        should_free = 1;
+                        break;
+                    }
                 }
             }
         }
