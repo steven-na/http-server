@@ -21,7 +21,7 @@ typedef uint64_t u64;
 #define PORT 80
 #define BUFFER_SIZE 1024
 
-i32 read_html_in(char **html_buffer, char *filename) {
+i32 read_file_in(char **file_buffer, const char *filename) {
     FILE *fp = fopen(filename, "rb");
     if (!fp)
         perror("file load"), exit(1);
@@ -30,16 +30,16 @@ i32 read_html_in(char **html_buffer, char *filename) {
     long lSize = ftell(fp);
     rewind(fp);
 
-    *html_buffer = calloc(1, lSize + 1);
-    if (!*html_buffer) {
+    *file_buffer = calloc(1, lSize + 1);
+    if (!*file_buffer) {
         fclose(fp);
         perror("memory alloc fails");
         return -1;
     }
 
-    if (1 != fread(*html_buffer, lSize, 1, fp)) {
+    if (1 != fread(*file_buffer, lSize, 1, fp)) {
         fclose(fp);
-        free(*html_buffer);
+        free(*file_buffer);
         perror("entire read fails");
         return -1;
     }
@@ -47,26 +47,131 @@ i32 read_html_in(char **html_buffer, char *filename) {
     return lSize + 1;
 }
 
-i32 replace_text(char *haystack, const char *needle, const char *replace) {
-    size_t haystackLen = strlen(haystack);
-    char *pos = strstr(haystack, needle);
-    if (!pos) {
+i32 replace_text(char **haystack, const char *needle, const char *replace) {
+    size_t haystackLen = strlen(*haystack);
+    char *pos = strstr(*haystack, needle);
+    if (!pos)
         return 0;
-    }
-    i32 offset = pos - haystack;
 
+    i32 offset = pos - *haystack;
     size_t ndlLen = strlen(needle);
     size_t repLen = strlen(replace);
-    size_t tailLen = haystackLen - offset - ndlLen;
+    size_t tailLen = haystackLen - offset - ndlLen + 1;
 
     if (repLen > ndlLen) {
-        haystack = realloc(haystack, haystackLen + (repLen - ndlLen) + 1);
-        pos = haystack + offset;
+        char *tmp = realloc(*haystack, haystackLen + (repLen - ndlLen) + 1);
+        if (!tmp)
+            return -1;
+        *haystack = tmp;
     }
+
+    pos = *haystack + offset;
     memmove(pos + repLen, pos + ndlLen, tailLen);
     memcpy(pos, replace, repLen);
-    haystackLen += (repLen - ndlLen);
-    return haystackLen;
+
+    return haystackLen + (repLen - ndlLen);
+}
+
+i32 replace_all_text(char **haystack, const char *needle, const char *replace) {
+    size_t haystackLen = strlen(*haystack);
+    for (;;) {
+        char *pos = strstr(*haystack, needle);
+        if (!pos)
+            return 0;
+
+        i32 offset = pos - *haystack;
+        size_t ndlLen = strlen(needle);
+        size_t repLen = strlen(replace);
+        size_t tailLen = haystackLen - offset - ndlLen + 1;
+
+        if (repLen > ndlLen) {
+            char *tmp = realloc(*haystack, haystackLen + (repLen - ndlLen) + 1);
+            if (!tmp)
+                return -1;
+            *haystack = tmp;
+        }
+
+        pos = *haystack + offset;
+        memmove(pos + repLen, pos + ndlLen, tailLen);
+        memcpy(pos, replace, repLen);
+    }
+
+    return strlen(*haystack);
+}
+
+typedef struct {
+    char *title;
+    char *author;
+    char *date;
+    char *fileName;
+} post;
+
+i32 get_posts_list(post **posts_list) {
+    char *post_list;
+    i32 file_size = read_file_in(&post_list, "./posts/posts.txt");
+    if (file_size == -1) {
+        perror("posts file read");
+        return -1;
+    }
+    i32 post_count = 0;
+
+    size_t cursor_pos = 0;
+    for (;;) {
+        char *line_start = post_list + cursor_pos;
+
+        char *title_end_pos = strstr(line_start, " ");
+        if (!title_end_pos)
+            break;
+        char *author_end_pos = strstr(title_end_pos + 1, " ");
+        if (!author_end_pos)
+            break;
+        char *date_end_pos = strstr(author_end_pos + 1, " ");
+        if (!date_end_pos)
+            break;
+        char *filename_end_pos = strstr(date_end_pos + 1, "\n");
+        if (!filename_end_pos)
+            break;
+
+        size_t title_len = title_end_pos - line_start;
+        size_t author_len = author_end_pos - (title_end_pos + 1);
+        size_t date_len = date_end_pos - (author_end_pos + 1);
+        size_t filename_len = filename_end_pos - (date_end_pos + 1);
+
+        char *title = malloc(title_len + 1);
+        char *author = malloc(author_len + 1);
+        char *date = malloc(date_len + 1);
+        char *filename = malloc(filename_len + 1);
+        if (!title || !author || !date || !filename)
+            return -1;
+
+        memcpy(title, line_start, title_len);
+        memcpy(author, title_end_pos + 1, author_len);
+        memcpy(date, author_end_pos + 1, date_len);
+        memcpy(filename, date_end_pos + 1, filename_len);
+
+        title[title_len] = '\0';
+        author[author_len] = '\0';
+        date[date_len] = '\0';
+        filename[filename_len] = '\0';
+
+        replace_all_text(&title, "%20", " ");
+        replace_all_text(&author, "%20", " ");
+        replace_all_text(&date, "%20", " ");
+
+        post *tmp = realloc(*posts_list, sizeof(post) * (post_count + 1));
+        if (!tmp)
+            return -1;
+        *posts_list = tmp;
+
+        (*posts_list)[post_count] = (post){.title = title,
+                                           .author = author,
+                                           .date = date,
+                                           .fileName = filename};
+        post_count++;
+        cursor_pos = (filename_end_pos + 1) - post_list;
+    }
+
+    return post_count;
 }
 
 i32 build_response(char **resp_buffer, char *html_content, i32 html_size) {
@@ -85,62 +190,80 @@ i32 build_response(char **resp_buffer, char *html_content, i32 html_size) {
     return strlen(resp) + html_size + 1;
 }
 
-i32 index_endpoint(char **resp_buffer, char *params) {
-    char *html_content;
-    i32 lSize = read_html_in(&html_content, "./pages/index.html");
-    if (lSize == -1) {
-        perror("file read");
-        return -1;
-    }
-
-    i32 result = build_response(resp_buffer, html_content, lSize);
-    if (result == -1) {
-        return -1;
-    }
-    return result;
-}
-
 i32 recent_post_endpoint(char **resp_buffer, char *params) {
     char *html_content;
-    i32 lSize = read_html_in(&html_content, "./templates/post.html");
+    i32 lSize = read_file_in(&html_content, "./templates/post.html");
     if (lSize == -1) {
         perror("file read");
-        return -1;
+        return 0;
     }
 
-    // lSize = replace_text(html_content, "<!-- ARTICLE TITLE -->", "Test
-    // Title"); lSize = replace_text(html_content, "<!-- ARTICLE TITLE -->",
-    // "Test Title"); lSize =
-    //     replace_text(html_content, "<!-- ARTICLE AUTHOR -->", "Test Author");
-    // lSize = replace_text(html_content, "<!-- ARTICLE DATE -->", "Jan 1,
-    // 2000");
-    lSize = replace_text(html_content, "<!-- ARTICLE CONTENT -->",
-                         "<p>Test Content</p>\n");
+    post *posts_list = NULL; // initialize to NULL
+    i32 post_count = get_posts_list(&posts_list);
+    if (post_count <= 0 || !posts_list) {
+        return 0;
+    }
+    const post *p = &posts_list[post_count - 1];
 
-    i32 result = build_response(resp_buffer, html_content, lSize);
+    char *post_body;
+    char *full_path;
+    asprintf(&full_path, "./posts/%s", p->fileName);
+    i32 post_size = read_file_in(&post_body, full_path);
+    free(full_path);
+    if (post_size == -1) {
+        return 0;
+    }
+
+    replace_all_text(&html_content, "<!-- ARTICLE TITLE -->", p->title);
+    replace_text(&html_content, "<!-- ARTICLE AUTHOR -->", p->author);
+    replace_text(&html_content, "<!-- ARTICLE DATE -->", p->date);
+    replace_text(&html_content, "<!-- ARTICLE CONTENT -->", post_body);
+
+    i32 result =
+        build_response(resp_buffer, html_content, strlen(html_content));
     if (result == -1) {
         return -1;
     }
     return result;
 }
-
 i32 specific_post_endpoint(char **resp_buffer, char *params) {
     char *html_content;
-    i32 lSize = read_html_in(&html_content, "./templates/post.html");
+    i32 lSize = read_file_in(&html_content, "./templates/post.html");
     if (lSize == -1) {
         perror("file read");
-        return -1;
+        return 0;
     }
 
-    i32 p = 1;
-    // TODO: each replace is adding "dy>" or something similar to the html
-    p *= replace_text(html_content, "<!-- ARTICLE TITLE -->", "Test Title");
-    p *= replace_text(html_content, "<!-- ARTICLE TITLE -->", "Test Title");
-    p *= replace_text(html_content, "<!-- ARTICLE AUTHOR -->", "Test Author");
-    p *= replace_text(html_content, "<!-- ARTICLE DATE -->", "Jan 1, 2000");
-    // p *= replace_text(html_content, "<!-- ARTICLE CONTENT -->", params);
+    post *posts_list = NULL; // initialize to NULL
+    i32 post_count = get_posts_list(&posts_list);
+    if (post_count <= 0 || !posts_list) {
+        return 0;
+    }
+    const post *p = NULL;
+    for (int i = 0; i < post_count; i++) {
+        if (strcmp(posts_list[i].fileName, params) == 0) {
+            p = &posts_list[i];
+            break;
+        }
+    }
 
-    printf("\n%i\n", p);
+    if (!p) {
+        return 0;
+    }
+
+    char *post_body;
+    char *full_path;
+    asprintf(&full_path, "./posts/%s", p->fileName);
+    i32 post_size = read_file_in(&post_body, full_path);
+    free(full_path);
+    if (post_size == -1) {
+        return 0;
+    }
+
+    replace_all_text(&html_content, "<!-- ARTICLE TITLE -->", p->title);
+    replace_text(&html_content, "<!-- ARTICLE AUTHOR -->", p->author);
+    replace_text(&html_content, "<!-- ARTICLE DATE -->", p->date);
+    replace_text(&html_content, "<!-- ARTICLE CONTENT -->", post_body);
 
     i32 result =
         build_response(resp_buffer, html_content, strlen(html_content));
@@ -150,9 +273,24 @@ i32 specific_post_endpoint(char **resp_buffer, char *params) {
     return result;
 }
 
+i32 index_endpoint(char **resp_buffer, char *params) {
+    char *html_content;
+    i32 lSize = read_file_in(&html_content, "./pages/index.html");
+    if (lSize == -1) {
+        perror("file read");
+        return -1;
+    }
+
+    i32 result = build_response(resp_buffer, html_content, lSize);
+    if (result == -1) {
+        return -1;
+    }
+    return result;
+}
+
 i32 not_found_endpoint(char **resp_buffer) {
     char *html_content;
-    i32 lSize = read_html_in(&html_content, "./pages/404.html");
+    i32 lSize = read_file_in(&html_content, "./pages/404.html");
     if (lSize == -1) {
         perror("file read");
         return -1;
@@ -186,23 +324,20 @@ int main() {
         return 1;
     }
     printf("sock create success.\n");
-
+    int opt = 1;
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(int));
     struct sockaddr_in host_addr;
     int host_addrlen = sizeof(host_addr);
-
     host_addr.sin_family = AF_INET;
     host_addr.sin_port = htons(PORT);
     host_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-
     struct sockaddr_in client_addr;
     int client_addrlen = sizeof(client_addr);
-
     if (bind(sockfd, (struct sockaddr *)&host_addr, host_addrlen) != 0) {
         perror("webserver (bind)");
         return 1;
     }
     printf("sock bind success..\n");
-
     if (listen(sockfd, SOMAXCONN) != 0) {
         perror("webserver (listen)");
         return 1;
@@ -212,7 +347,7 @@ int main() {
 
     u8 endpoint_count = 3;
     endpoint_mapping endpoints[endpoint_count];
-    endpoints[0] = (endpoint_mapping){.endpoint = "/posts/recent",
+    endpoints[0] = (endpoint_mapping){.endpoint = "/posts/recent/",
                                       .func = recent_post_endpoint,
                                       .is_prefix = false};
     endpoints[1] = (endpoint_mapping){.endpoint = "/posts/",
@@ -229,14 +364,12 @@ int main() {
             perror("webserver (accept)");
             continue;
         }
-
         int sockn = getsockname(newsockfd, (struct sockaddr *)&client_addr,
                                 (socklen_t *)&client_addrlen);
         if (sockn < 0) {
             perror("webserver (getsockname)");
             continue;
         }
-
         if (read(newsockfd, read_buffer, BUFFER_SIZE) < 0) {
             perror("webserver (read)");
             continue;
@@ -294,6 +427,8 @@ int main() {
 
         close(newsockfd);
     }
+
+    close(sockfd);
 
     return 0;
 }

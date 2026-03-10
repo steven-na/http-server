@@ -1,3 +1,4 @@
 main
 posts/*.html
 posts/*.txt
+/posts/test_post
