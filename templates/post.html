@@ -4,7 +4,44 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
   <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const overlay = document.createElement('div');
+      Object.assign(overlay.style, {
+        display: 'none', position: 'fixed', inset: '0',
+        background: 'rgba(0,0,0,0.85)', zIndex: '999',
+        cursor: 'zoom-out', alignItems: 'center', justifyContent: 'center'
+      });
+  
+      const lightboxImg = document.createElement('img');
+      Object.assign(lightboxImg.style, {
+        maxWidth: '90vw', maxHeight: '90vh',
+        objectFit: 'contain', borderRadius: '2px'
+      });
+  
+      overlay.appendChild(lightboxImg);
+      document.body.appendChild(overlay);
+  
+      document.querySelectorAll('article > img').forEach(img => {
+        img.style.cursor = 'zoom-in';
+        img.addEventListener('click', () => {
+          lightboxImg.src = img.src;
+          overlay.style.display = 'flex';
+        });
+      });
+  
+      overlay.addEventListener('click', () => {
+        overlay.style.display = 'none';
+        lightboxImg.src = '';
+      });
+  
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') overlay.click();
+      });
+    });
+  </script>
+    <script>
     (function() {
       var t = localStorage.getItem('theme') ||
               (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -68,7 +105,7 @@
     }
 
     .header-inner {
-      max-width: 860px;
+      max-width: 90%;
       margin: 0 auto;
       padding: 1.25rem 0;
       display: flex;
@@ -163,7 +200,7 @@
 
     /* ── Post hero ── */
     .post-hero {
-      max-width: 860px;
+      max-width: 80%;
       margin: 0 auto;
       padding: 3.5rem 0 2.5rem;
       border-bottom: 1px solid var(--border);
@@ -190,9 +227,14 @@
 
     /* ── Main / Article ── */
     main {
-      max-width: 860px;
+      max-width: 80%;
       margin: 0 auto;
       padding: 3.5rem 0 4rem;
+    }
+
+    article {
+      max-width: 100%;
+      overflow: hidden;
     }
 
     p  { margin-bottom: 1.2rem; }
@@ -256,22 +298,24 @@
     article > img {
       display: block;
       max-width: 100%;
+      width: auto;
       height: auto;
       margin: 1.4rem auto;
+      overflow: hidden;
     }
-
+    
     article > img:has(+ img) {
       display: inline-block;
-      width: calc(50% - 0.4rem);
+      width: auto;
       max-width: calc(50% - 0.4rem);
       height: auto;
       margin: 1.4rem 0.4rem 1.4rem 0;
       vertical-align: top;
     }
-
+    
     article > img + img {
       display: inline-block;
-      width: calc(50% - 0.4rem);
+      width: auto;
       max-width: calc(50% - 0.4rem);
       height: auto;
       margin: 1.4rem 0 1.4rem 0;
@@ -280,7 +324,7 @@
 
     /* ── Footer ── */
     footer {
-      max-width: 860px;
+      max-width: 90%;
       margin: 0 auto;
       border-top: 1px solid var(--border);
       padding: 1.75rem 0 2.5rem;
@@ -354,7 +398,7 @@
 
     /* ── Post navigation ── */
     .post-nav {
-      max-width: 860px;
+      max-width: 90%;
       margin: 0 auto;
       padding: 2.5rem 0;
       border-top: 1px solid var(--border);
@@ -442,7 +486,6 @@
 </main>
 
 <nav class="post-nav" aria-label="Post navigation">
-  <!-- PREVIOUS POST — replace href and title, or remove this block if no previous post -->
   <!-- REMOVE PREV POST START -->
   <a class="post-nav-link prev" href="/posts/PREVIOUS-POST-SLUG">
     <span class="post-nav-label">
@@ -455,7 +498,6 @@
   </a>
   <!-- REMOVE PREV POST END -->
 
-  <!-- NEXT POST — replace href and title, or remove this block if no next post -->
   <!-- REMOVE NEXT POST START -->
   <a class="post-nav-link next" href="/posts/NEXT-POST-SLUG">
     <span class="post-nav-label">

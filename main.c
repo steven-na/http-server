@@ -50,9 +50,9 @@ i32 read_file_in(char **file_buffer, const char *filename) {
 i32 replace_text(char **haystack, const char *needle, const char *replace) {
     size_t haystackLen = strlen(*haystack);
     char *pos = strstr(*haystack, needle);
-    if (!pos)
+    if (!pos) {
         return 0;
-
+    }
     i32 offset = pos - *haystack;
     size_t ndlLen = strlen(needle);
     size_t repLen = strlen(replace);
@@ -69,7 +69,7 @@ i32 replace_text(char **haystack, const char *needle, const char *replace) {
     memmove(pos + repLen, pos + ndlLen, tailLen);
     memcpy(pos, replace, repLen);
 
-    return haystackLen + (repLen - ndlLen);
+    return strlen(*haystack) + 1;
 }
 
 i32 replace_all_text(char **haystack, const char *needle, const char *replace) {
@@ -96,7 +96,7 @@ i32 replace_all_text(char **haystack, const char *needle, const char *replace) {
         memcpy(pos, replace, repLen);
     }
 
-    return strlen(*haystack);
+    return strlen(*haystack) + 1;
 }
 
 typedef struct {
@@ -219,22 +219,97 @@ i32 specific_post_endpoint(char **resp_buffer, char *params) {
         return 0;
     }
 
-    post *posts_list = NULL; // initialize to NULL
+    post *posts_list = NULL;
     i32 post_count = get_posts_list(&posts_list);
     if (post_count <= 0 || !posts_list) {
         return 0;
     }
     const post *p = NULL;
-    int postindex;
-    for (postindex = 0; postindex < post_count; postindex++) {
-        if (strcmp(posts_list[postindex].fileName, params) == 0) {
-            p = &posts_list[postindex];
+    int post_index;
+    for (post_index = 0; post_index < post_count; post_index++) {
+        if (strcmp(posts_list[post_index].fileName, params) == 0) {
+            p = &posts_list[post_index];
             break;
         }
     }
 
     if (!p) {
         return 0;
+    }
+
+    printf("val: %i %i\n", post_index, post_count);
+    if (post_index > 0) {
+        const post *prev_post = &posts_list[post_index - 1];
+        lSize = replace_text(&html_content, "<!-- PREVIOUS POST TITLE -->",
+                             prev_post->title);
+        lSize = replace_text(&html_content, "PREVIOUS-POST-SLUG",
+                             prev_post->fileName);
+    } else {
+        const char *rem_prev_start =
+            strstr(html_content, "<!-- REMOVE PREV POST START -->");
+        if (!rem_prev_start) {
+            return 0;
+        }
+        const char *rem_prev_end =
+            strstr(html_content, "<!-- REMOVE PREV POST END -->");
+        if (!rem_prev_end) {
+            return 0;
+        }
+
+        i32 end_marker_len = strlen("<!-- REMOVE PREV POST END -->");
+        i32 delete_offset = rem_prev_start - html_content;
+        i32 delete_length = (rem_prev_end - rem_prev_start) + end_marker_len;
+        i32 delete_tailln = lSize - delete_offset - delete_length + 1;
+
+        printf("[DEBUG] bounds check: delete_offset(%i) + delete_length(%i) + "
+               "delete_tailln(%i) = %i, lSize=%i\n",
+               delete_offset, delete_length, delete_tailln,
+               delete_offset + delete_length + delete_tailln, lSize);
+        memmove(html_content + delete_offset,
+                html_content + delete_offset + delete_length, delete_tailln);
+        char *tmp = realloc(html_content, lSize - delete_length + 1);
+        if (!tmp) {
+            return 0;
+        }
+        lSize -= delete_length;
+        html_content = tmp;
+    }
+
+    if ((post_index + 1) - post_count < 0) {
+        const post *next_post = &posts_list[post_index + 1];
+        lSize = replace_text(&html_content, "<!-- NEXT POST TITLE -->",
+                             next_post->title);
+        lSize =
+            replace_text(&html_content, "NEXT-POST-SLUG", next_post->fileName);
+    } else {
+        const char *rem_next_start =
+            strstr(html_content, "<!-- REMOVE NEXT POST START -->");
+        if (!rem_next_start) {
+            return 0;
+        }
+        const char *rem_next_end =
+            strstr(html_content, "<!-- REMOVE NEXT POST END -->");
+        if (!rem_next_end) {
+            return 0;
+        }
+
+        i32 end_marker_len = strlen("<!-- REMOVE NEXT POST END -->");
+        i32 delete_offset = rem_next_start - html_content;
+        i32 delete_length = (rem_next_end - rem_next_start) + end_marker_len;
+        i32 delete_tailln = lSize - delete_offset - delete_length + 1;
+
+        printf("[DEBUG] bounds check: delete_offset(%i) + delete_length(%i) + "
+               "delete_tailln(%i) = %i, lSize=%i\n",
+               delete_offset, delete_length, delete_tailln,
+               delete_offset + delete_length + delete_tailln, lSize);
+        memmove(html_content + delete_offset,
+                html_content + delete_offset + delete_length, delete_tailln);
+        char *tmp = realloc(html_content, lSize - delete_length + 1);
+        if (!tmp) {
+            return 0;
+        }
+        lSize -= delete_length;
+        html_content = tmp;
     }
 
     char *post_body;
@@ -256,6 +331,7 @@ i32 specific_post_endpoint(char **resp_buffer, char *params) {
     if (result == -1) {
         return -1;
     }
+    // free(html_content);
     return result;
 }
 
