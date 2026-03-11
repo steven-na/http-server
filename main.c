@@ -18,7 +18,7 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
 
-#define PORT 80
+#define PORT 7001
 #define BUFFER_SIZE 1024
 
 i32 read_file_in(char **file_buffer, const char *filename) {
@@ -198,7 +198,8 @@ i32 recent_post_endpoint(char **resp_buffer, char *params) {
     }
     const post *p = &posts_list[post_count - 1];
     char endpoint_resp[] = "HTTP/1.0 301 Moved Permanently\r\n"
-                           "Location: /posts/%s\r\n";
+                           "Location: /posts/%s\r\n"
+                           "\r\n";
     char *redirect_resp;
     asprintf(&redirect_resp, endpoint_resp, p->fileName);
     *resp_buffer = calloc(1, strlen(redirect_resp) + 1);
@@ -380,6 +381,7 @@ typedef struct {
 } endpoint_mapping;
 
 int main() {
+    setbuf(stdout, NULL);
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd == -1) {
         perror("webserver (socket)");
@@ -448,7 +450,8 @@ int main() {
 
         if (strcmp(uri, "/") == 0) {
             endpoint_resp = "HTTP/1.0 301 Moved Permanently\r\n"
-                            "Location: /home/\r\n";
+                            "Location: /home/\r\n"
+                            "\r\n";
             resp_len = strlen(endpoint_resp);
         } else {
             for (u8 i = 0; i < endpoint_count; i++) {

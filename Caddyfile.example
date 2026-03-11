@@ -1,0 +1,10 @@
+# Local development
+localhost {
+    tls internal
+    reverse_proxy server:80
+}
+
+# Production
+api.example.com {
+    reverse_proxy server:80
+}

@@ -1,0 +1,26 @@
+services:
+  website-server:
+    build: .
+    ports:
+      - "7001:7001"
+    volumes:
+      - ./posts:/app/posts
+      - ./pages:/app/pages
+      - ./templates:/app/templates
+    restart: unless-stopped
+  website-caddy:
+    container_name: website-caddy
+    image: caddy:alpine
+    ports:
+      - "443:443"
+      - "80:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - website-server
+    restart: unless-stopped
+volumes:
+  caddy_data:
+  caddy_config:

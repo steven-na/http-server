@@ -1,3 +1,4 @@
 main
 posts/*
 !posts/posts.txt.example
+/Caddyfile
