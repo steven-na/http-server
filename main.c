@@ -341,7 +341,7 @@ i32 index_endpoint(char **resp_buffer, char *params) {
     i32 lSize = read_file_in(&html_content, "./pages/index.html");
     if (lSize == -1) {
         perror("file read");
-        return -1;
+        return 0;
     }
 
     i32 result = build_response(resp_buffer, html_content, lSize);
@@ -349,6 +349,30 @@ i32 index_endpoint(char **resp_buffer, char *params) {
         return -1;
     }
     return result;
+}
+
+i32 rss_endpoint(char **resp_buffer, char *params) {
+    char *rss_content;
+    i32 lSize = read_file_in(&rss_content, "./feed.xml");
+    if (lSize == -1) {
+        perror("file read");
+        return 0;
+    }
+
+    const char resp[] = "HTTP/1.0 200 OK\r\n"
+                        "Content-type: application/rss+xml\r\n\r\n";
+
+    *resp_buffer = calloc(1, strlen(resp) + lSize + 1);
+    if (!*resp_buffer) {
+        free(rss_content);
+        perror("memory alloc fails");
+        return -1;
+    }
+    strcpy(*resp_buffer, resp);
+    memcpy(*resp_buffer + strlen(resp), rss_content, lSize);
+    free(rss_content);
+
+    return strlen(*resp_buffer) + 1;
 }
 
 i32 not_found_endpoint(char **resp_buffer) {
@@ -409,7 +433,7 @@ int main() {
     printf("server listening for connectons...\n");
     char read_buffer[BUFFER_SIZE];
 
-    u8 endpoint_count = 3;
+    u8 endpoint_count = 4;
     endpoint_mapping endpoints[endpoint_count];
     endpoints[0] = (endpoint_mapping){.endpoint = "/posts/recent/",
                                       .func = recent_post_endpoint,
@@ -419,6 +443,9 @@ int main() {
                                       .is_prefix = true};
     endpoints[2] =
         (endpoint_mapping){.endpoint = "/home/", .func = index_endpoint};
+    endpoints[3] =
+        (endpoint_mapping){.endpoint = "/rss.xml", .func = rss_endpoint};
+
     i32 (*nf_endpoint)(char **) = not_found_endpoint;
 
     for (;;) {
@@ -455,8 +482,6 @@ int main() {
             resp_len = strlen(endpoint_resp);
         } else {
             for (u8 i = 0; i < endpoint_count; i++) {
-                printf("strncmp:%i\n", strncmp(uri, endpoints[i].endpoint,
-                                               strlen(endpoints[i].endpoint)));
                 if (endpoints[i].is_prefix) {
                     if (strncmp(uri, endpoints[i].endpoint,
                                 strlen(endpoints[i].endpoint)) == 0) {

@@ -10,9 +10,9 @@ MD2HTML="$REPO_ROOT/tools/md2html"
 FEED_XML="$REPO_ROOT/feed.xml"
 
 # Site config (edit these)
-SITE_URL="https://yourdomain.com"
-SITE_TITLE="Your Site"
-SITE_DESCRIPTION="Your site description"
+SITE_URL="https://example.com"
+SITE_TITLE="example site"
+SITE_DESCRIPTION="example description"
 
 # ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -21,8 +21,8 @@ usage() {
 Usage: $(basename "$0") <command> [options]
 
 Commands:
-    add       Add a new post
-    rss       Rebuild RSS feed from posts.txt
+    add       Add a new post (rebuilds RSS automatically)
+    remove    Remove an existing post
     notify    Email subscribers about latest post
     list      List all posts
 
@@ -32,13 +32,15 @@ Add options:
     -d, --date     Post date as YYYY-MM-DD, or "today" (required)
     -f, --file     Input markdown file (required)
     -n, --name     Output filename (optional, derived from title if omitted)
-    --rss          Rebuild RSS after adding
     --notify       Send notifications after adding
 
+Remove options:
+    -n, --name     Post filename/slug to remove (required)
+
 Examples:
-    $(basename "$0") add -t "My First Post" -a "John Doe" -d today -f draft.md --rss
+    $(basename "$0") add -t "My First Post" -a "John Doe" -d today -f draft.md
     $(basename "$0") add -t "Another Post" -a "Jane" -d 2026-03-11 -f post.md -n another-post
-    $(basename "$0") rss
+    $(basename "$0") remove -n my-first-post
     $(basename "$0") list
 EOF
     exit 1
@@ -79,10 +81,10 @@ format_date() {
     month_name=$(date -d "$input" +%B)
 
     case "$day" in
-        1|21|31) suffix="st" ;;
-        2|22)    suffix="nd" ;;
-        3|23)    suffix="rd" ;;
-        *)       suffix="th" ;;
+    1 | 21 | 31) suffix="st" ;;
+    2 | 22) suffix="nd" ;;
+    3 | 23) suffix="rd" ;;
+    *) suffix="th" ;;
     esac
 
     echo "${month_name} ${day}${suffix}, ${year}"
@@ -100,30 +102,47 @@ format_date_rfc2822() {
 # ─── Commands ────────────────────────────────────────────────────────────────
 
 cmd_add() {
-    local title="" author="" date_input="" file="" name="" do_rss=0 do_notify=0
+    local title="" author="" date_input="" file="" name="" do_notify=0
 
     while [ $# -gt 0 ]; do
         case "$1" in
-            -t|--title)  title="$2";      shift 2 ;;
-            -a|--author) author="$2";     shift 2 ;;
-            -d|--date)   date_input="$2"; shift 2 ;;
-            -f|--file)   file="$2";       shift 2 ;;
-            -n|--name)   name="$2";       shift 2 ;;
-            --rss)       do_rss=1;        shift ;;
-            --notify)    do_notify=1;     shift ;;
-            *) die "unknown option: $1" ;;
+        -t | --title)
+            title="$2"
+            shift 2
+            ;;
+        -a | --author)
+            author="$2"
+            shift 2
+            ;;
+        -d | --date)
+            date_input="$2"
+            shift 2
+            ;;
+        -f | --file)
+            file="$2"
+            shift 2
+            ;;
+        -n | --name)
+            name="$2"
+            shift 2
+            ;;
+        --notify)
+            do_notify=1
+            shift
+            ;;
+        *) die "unknown option: $1" ;;
         esac
     done
 
-    [ -z "$title" ]      && die "title is required (-t)"
-    [ -z "$author" ]     && die "author is required (-a)"
-    [ -z "$date_input" ] && die "date is required (-d)"
-    [ -z "$file" ]       && die "markdown file is required (-f)"
-    [ -f "$file" ]       || die "file not found: $file"
-    [ -x "$MD2HTML" ]    || die "converter not found or not executable: $MD2HTML"
+    [ "$title" = "" ] && die "title is required (-t)"
+    [ "$author" = "" ] && die "author is required (-a)"
+    [ "$date_input" = "" ] && die "date is required (-d)"
+    [ "$file" = "" ] && die "markdown file is required (-f)"
+    [ -f "$file" ] || die "file not found: $file"
+    [ -x "$MD2HTML" ] || die "converter not found or not executable: $MD2HTML"
 
     # Derive filename from title if not given
-    if [ -z "$name" ]; then
+    if [ "$name" = "" ]; then
         name=$(slugify "$title")
     fi
 
@@ -147,17 +166,10 @@ cmd_add() {
     encoded_author=$(encode_spaces "$author")
     encoded_date=$(encode_spaces "$formatted_date")
 
-    echo "${encoded_title} ${encoded_author} ${encoded_date} ${name}" >> "$POSTS_TXT"
+    echo "${encoded_title} ${encoded_author} ${encoded_date} ${name}" >>"$POSTS_TXT"
     echo "added entry to posts.txt"
 
-    # Git commit
-    git -C "$REPO_ROOT" add "$output" "$POSTS_TXT"
-    git -C "$REPO_ROOT" commit -m "add post: $title"
-    echo "committed to git"
-
-    if [ "$do_rss" -eq 1 ]; then
-        cmd_rss
-    fi
+    cmd_rss
 
     if [ "$do_notify" -eq 1 ]; then
         cmd_notify
@@ -176,13 +188,46 @@ cmd_list() {
     echo "------"
     local i=1
     while IFS= read -r line; do
-        [ -z "$line" ] && continue
+        [ "$line" = "" ] && continue
         # Decode %20 back to spaces for display
         local decoded
         decoded=$(echo "$line" | sed 's/%20/ /g')
         echo "  $i. $decoded"
         i=$((i + 1))
-    done < "$POSTS_TXT"
+    done <"$POSTS_TXT"
+}
+
+cmd_remove() {
+    local name=""
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+        -n | --name)
+            name="$2"
+            shift 2
+            ;;
+        *) die "unknown option: $1" ;;
+        esac
+    done
+
+    [ "$name" = "" ] && die "name is required (-n)"
+
+    local post_file="$POSTS_DIR/$name"
+
+    [ -f "$post_file" ] || die "post not found: $post_file"
+    grep -q " ${name}$" "$POSTS_TXT" || die "post not found in posts.txt: $name"
+
+    # Remove the post file
+    rm "$post_file"
+    echo "removed $post_file"
+
+    # Remove the matching line from posts.txt (match on 4th field = filename)
+    sed -i "/ ${name}$/d" "$POSTS_TXT"
+    echo "removed entry from posts.txt"
+
+    # Rebuild RSS
+    cmd_rss
+
 }
 
 cmd_rss() {
@@ -201,7 +246,7 @@ cmd_rss() {
     # post's HTML.
     # ──────────────────────────────────────────────────────────────────────
 
-    cat > "$FEED_XML" <<EOF
+    cat >"$FEED_XML" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
 <channel>
@@ -212,7 +257,7 @@ cmd_rss() {
 EOF
 
     while IFS= read -r line; do
-        [ -z "$line" ] && continue
+        [ "$line" = "" ] && continue
 
         local title author date_str filename
         # Split on single spaces — each field is %20-encoded so no internal spaces
@@ -221,23 +266,26 @@ EOF
         date_str=$(echo "$line" | awk '{print $3}' | sed 's/%20/ /g')
         filename=$(echo "$line" | awk '{print $4}')
 
-        cat >> "$FEED_XML" <<EOF
+        # Convert "March 11th, 2026" -> RFC 2822 by stripping ordinal suffix
+        local clean_date rfc_date
+        clean_date=$(echo "$date_str" | sed 's/\([0-9]\)\(st\|nd\|rd\|th\)/\1/')
+        rfc_date=$(date -d "$clean_date" -R)
+
+        cat >>"$FEED_XML" <<EOF
     <item>
         <title>${title}</title>
         <link>${SITE_URL}/posts/${filename}</link>
         <author>${author}</author>
-        <pubDate>${date_str}</pubDate>
+        <pubDate>${rfc_date}</pubDate>
     </item>
 EOF
-    done < "$POSTS_TXT"
+    done <"$POSTS_TXT"
 
-    cat >> "$FEED_XML" <<EOF
+    cat >>"$FEED_XML" <<EOF
 </channel>
 </rss>
 EOF
 
-    git -C "$REPO_ROOT" add "$FEED_XML"
-    git -C "$REPO_ROOT" commit -m "rebuild rss feed"
     echo "RSS feed written to $FEED_XML"
 }
 
@@ -285,10 +333,9 @@ command="$1"
 shift
 
 case "$command" in
-    add)    cmd_add "$@" ;;
-    rss)    cmd_rss ;;
-    notify) cmd_notify ;;
-    list)   cmd_list ;;
-    *)      usage ;;
+add) cmd_add "$@" ;;
+remove) cmd_remove "$@" ;;
+notify) cmd_notify ;;
+list) cmd_list ;;
+*) usage ;;
 esac
-```
