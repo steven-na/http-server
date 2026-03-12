@@ -1,0 +1,294 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+# ─── Configuration ───────────────────────────────────────────────────────────
+REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
+POSTS_DIR="$REPO_ROOT/posts"
+POSTS_TXT="$POSTS_DIR/posts.txt"
+MD2HTML="$REPO_ROOT/tools/md2html"
+FEED_XML="$REPO_ROOT/feed.xml"
+
+# Site config (edit these)
+SITE_URL="https://yourdomain.com"
+SITE_TITLE="Your Site"
+SITE_DESCRIPTION="Your site description"
+
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") <command> [options]
+
+Commands:
+    add       Add a new post
+    rss       Rebuild RSS feed from posts.txt
+    notify    Email subscribers about latest post
+    list      List all posts
+
+Add options:
+    -t, --title    Post title (required)
+    -a, --author   Post author (required)
+    -d, --date     Post date as YYYY-MM-DD, or "today" (required)
+    -f, --file     Input markdown file (required)
+    -n, --name     Output filename (optional, derived from title if omitted)
+    --rss          Rebuild RSS after adding
+    --notify       Send notifications after adding
+
+Examples:
+    $(basename "$0") add -t "My First Post" -a "John Doe" -d today -f draft.md --rss
+    $(basename "$0") add -t "Another Post" -a "Jane" -d 2026-03-11 -f post.md -n another-post
+    $(basename "$0") rss
+    $(basename "$0") list
+EOF
+    exit 1
+}
+
+die() {
+    echo "error: $1" >&2
+    exit 1
+}
+
+# Turn "My Post Title" into "my-post-title"
+slugify() {
+    echo "$1" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g' | sed 's/^-//;s/-$//'
+}
+
+# Encode spaces as %20 for posts.txt
+encode_spaces() {
+    echo "$1" | sed 's/ /%20/g'
+}
+
+# Format YYYY-MM-DD into "Month Day#, Year"
+format_date() {
+    local input="$1"
+
+    if [ "$input" = "today" ]; then
+        input=$(date +%Y-%m-%d)
+    fi
+
+    # Validate format
+    if ! echo "$input" | grep -qE '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+        die "date must be YYYY-MM-DD or 'today'"
+    fi
+
+    local year month day month_name suffix
+    year=$(date -d "$input" +%Y)
+    month=$(date -d "$input" +%-m)
+    day=$(date -d "$input" +%-d)
+    month_name=$(date -d "$input" +%B)
+
+    case "$day" in
+        1|21|31) suffix="st" ;;
+        2|22)    suffix="nd" ;;
+        3|23)    suffix="rd" ;;
+        *)       suffix="th" ;;
+    esac
+
+    echo "${month_name} ${day}${suffix}, ${year}"
+}
+
+# Format date for RSS (RFC 2822)
+format_date_rfc2822() {
+    local input="$1"
+    if [ "$input" = "today" ]; then
+        input=$(date +%Y-%m-%d)
+    fi
+    date -d "$input" -R
+}
+
+# ─── Commands ────────────────────────────────────────────────────────────────
+
+cmd_add() {
+    local title="" author="" date_input="" file="" name="" do_rss=0 do_notify=0
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -t|--title)  title="$2";      shift 2 ;;
+            -a|--author) author="$2";     shift 2 ;;
+            -d|--date)   date_input="$2"; shift 2 ;;
+            -f|--file)   file="$2";       shift 2 ;;
+            -n|--name)   name="$2";       shift 2 ;;
+            --rss)       do_rss=1;        shift ;;
+            --notify)    do_notify=1;     shift ;;
+            *) die "unknown option: $1" ;;
+        esac
+    done
+
+    [ -z "$title" ]      && die "title is required (-t)"
+    [ -z "$author" ]     && die "author is required (-a)"
+    [ -z "$date_input" ] && die "date is required (-d)"
+    [ -z "$file" ]       && die "markdown file is required (-f)"
+    [ -f "$file" ]       || die "file not found: $file"
+    [ -x "$MD2HTML" ]    || die "converter not found or not executable: $MD2HTML"
+
+    # Derive filename from title if not given
+    if [ -z "$name" ]; then
+        name=$(slugify "$title")
+    fi
+
+    local output="$POSTS_DIR/$name"
+
+    if [ -f "$output" ]; then
+        die "post already exists: $output"
+    fi
+
+    # Format the date
+    local formatted_date
+    formatted_date=$(format_date "$date_input")
+
+    # Convert markdown to html
+    echo "converting $file -> $output"
+    "$MD2HTML" "$file" "$output"
+
+    # Append to posts.txt
+    local encoded_title encoded_author encoded_date
+    encoded_title=$(encode_spaces "$title")
+    encoded_author=$(encode_spaces "$author")
+    encoded_date=$(encode_spaces "$formatted_date")
+
+    echo "${encoded_title} ${encoded_author} ${encoded_date} ${name}" >> "$POSTS_TXT"
+    echo "added entry to posts.txt"
+
+    # Git commit
+    git -C "$REPO_ROOT" add "$output" "$POSTS_TXT"
+    git -C "$REPO_ROOT" commit -m "add post: $title"
+    echo "committed to git"
+
+    if [ "$do_rss" -eq 1 ]; then
+        cmd_rss
+    fi
+
+    if [ "$do_notify" -eq 1 ]; then
+        cmd_notify
+    fi
+
+    echo "done: $SITE_URL/posts/$name"
+}
+
+cmd_list() {
+    if [ ! -f "$POSTS_TXT" ]; then
+        echo "no posts yet"
+        return
+    fi
+
+    echo "Posts:"
+    echo "------"
+    local i=1
+    while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        # Decode %20 back to spaces for display
+        local decoded
+        decoded=$(echo "$line" | sed 's/%20/ /g')
+        echo "  $i. $decoded"
+        i=$((i + 1))
+    done < "$POSTS_TXT"
+}
+
+cmd_rss() {
+    echo "rebuilding RSS feed..."
+
+    # ──────────────────────────────────────────────────────────────────────
+    # RSS feed generation
+    #
+    # This reads posts.txt and builds feed.xml.
+    # Each line in posts.txt is: title author date filename
+    # Fields have spaces encoded as %20.
+    #
+    # Customize the XML template below to match your feed structure.
+    # If you want per-post descriptions, you could extend posts.txt
+    # with another field, or extract the first paragraph from each
+    # post's HTML.
+    # ──────────────────────────────────────────────────────────────────────
+
+    cat > "$FEED_XML" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+<channel>
+    <title>${SITE_TITLE}</title>
+    <link>${SITE_URL}</link>
+    <description>${SITE_DESCRIPTION}</description>
+    <lastBuildDate>$(date -R)</lastBuildDate>
+EOF
+
+    while IFS= read -r line; do
+        [ -z "$line" ] && continue
+
+        local title author date_str filename
+        # Split on single spaces — each field is %20-encoded so no internal spaces
+        title=$(echo "$line" | awk '{print $1}' | sed 's/%20/ /g')
+        author=$(echo "$line" | awk '{print $2}' | sed 's/%20/ /g')
+        date_str=$(echo "$line" | awk '{print $3}' | sed 's/%20/ /g')
+        filename=$(echo "$line" | awk '{print $4}')
+
+        cat >> "$FEED_XML" <<EOF
+    <item>
+        <title>${title}</title>
+        <link>${SITE_URL}/posts/${filename}</link>
+        <author>${author}</author>
+        <pubDate>${date_str}</pubDate>
+    </item>
+EOF
+    done < "$POSTS_TXT"
+
+    cat >> "$FEED_XML" <<EOF
+</channel>
+</rss>
+EOF
+
+    git -C "$REPO_ROOT" add "$FEED_XML"
+    git -C "$REPO_ROOT" commit -m "rebuild rss feed"
+    echo "RSS feed written to $FEED_XML"
+}
+
+cmd_notify() {
+    # ──────────────────────────────────────────────────────────────────────
+    # Email notification stub
+    #
+    # Implement this however fits your setup. Some options:
+    #
+    # 1) curl an API (Mailgun, SendGrid, SES):
+    #
+    #    LATEST=$(tail -1 "$POSTS_TXT")
+    #    TITLE=$(echo "$LATEST" | awk '{print $1}' | sed 's/%20/ /g')
+    #    FILENAME=$(echo "$LATEST" | awk '{print $4}')
+    #    URL="$SITE_URL/posts/$FILENAME"
+    #
+    #    curl -s --user "api:$MAILGUN_API_KEY" \
+    #        "https://api.mailgun.net/v3/$MAILGUN_DOMAIN/messages" \
+    #        -F from="$SITE_TITLE <noreply@$MAILGUN_DOMAIN>" \
+    #        -F to="$MAILING_LIST" \
+    #        -F subject="New post: $TITLE" \
+    #        -F text="Read it here: $URL"
+    #
+    # 2) Hit a local endpoint on your C server:
+    #
+    #    curl -X POST http://localhost:8080/api/notify \
+    #        -H "Content-Type: application/json" \
+    #        -d "{\"title\": \"$TITLE\", \"url\": \"$URL\"}"
+    #
+    # 3) Use system mail (if configured):
+    #
+    #    echo "New post: $URL" | mail -s "New post: $TITLE" subscribers@yourdomain.com
+    #
+    # ──────────────────────────────────────────────────────────────────────
+
+    echo "notify: not yet implemented"
+    echo "edit cmd_notify() in $(basename "$0") to wire up your email provider"
+}
+
+# ─── Main ────────────────────────────────────────────────────────────────────
+
+[ $# -lt 1 ] && usage
+
+command="$1"
+shift
+
+case "$command" in
+    add)    cmd_add "$@" ;;
+    rss)    cmd_rss ;;
+    notify) cmd_notify ;;
+    list)   cmd_list ;;
+    *)      usage ;;
+esac
+```

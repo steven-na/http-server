@@ -5,6 +5,6 @@ localhost {
 }
 
 # Production
-api.example.com {
+example.com {
     reverse_proxy server:80
 }

@@ -1,4 +1,11 @@
 services:
+  cloudflare-ddns:
+    image: favonia/cloudflare-ddns:latest
+    restart: unless-stopped
+    environment:
+      - CF_API_TOKEN=TOKEN
+      - DOMAINS=example.com
+      - PROXIED=true
   website-server:
     build: .
     ports:

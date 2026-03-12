@@ -2,3 +2,6 @@ main
 posts/*
 !posts/posts.txt.example
 /Caddyfile
+/add_post.sh
+/feed.xml
+/compose.yaml
