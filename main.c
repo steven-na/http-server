@@ -262,10 +262,6 @@ i32 specific_post_endpoint(char **resp_buffer, char *params) {
         i32 delete_length = (rem_prev_end - rem_prev_start) + end_marker_len;
         i32 delete_tailln = lSize - delete_offset - delete_length + 1;
 
-        printf("[DEBUG] bounds check: delete_offset(%i) + delete_length(%i) + "
-               "delete_tailln(%i) = %i, lSize=%i\n",
-               delete_offset, delete_length, delete_tailln,
-               delete_offset + delete_length + delete_tailln, lSize);
         memmove(html_content + delete_offset,
                 html_content + delete_offset + delete_length, delete_tailln);
         char *tmp = realloc(html_content, lSize - delete_length + 1);
@@ -299,10 +295,6 @@ i32 specific_post_endpoint(char **resp_buffer, char *params) {
         i32 delete_length = (rem_next_end - rem_next_start) + end_marker_len;
         i32 delete_tailln = lSize - delete_offset - delete_length + 1;
 
-        printf("[DEBUG] bounds check: delete_offset(%i) + delete_length(%i) + "
-               "delete_tailln(%i) = %i, lSize=%i\n",
-               delete_offset, delete_length, delete_tailln,
-               delete_offset + delete_length + delete_tailln, lSize);
         memmove(html_content + delete_offset,
                 html_content + delete_offset + delete_length, delete_tailln);
         char *tmp = realloc(html_content, lSize - delete_length + 1);
@@ -375,6 +367,31 @@ i32 rss_endpoint(char **resp_buffer, char *params) {
     return strlen(*resp_buffer) + 1;
 }
 
+i32 ico_endpoint(char **resp_buffer, char *params) {
+    char *ico_content;
+    i32 lSize = read_file_in(&ico_content, "./favicon.ico");
+    if (lSize == -1) {
+        perror("file read");
+        return 0;
+    }
+
+    const char resp[] = "HTTP/1.0 200 OK\r\n"
+                        "Content-type: image/x-icon\r\n\r\n";
+
+    *resp_buffer = calloc(1, strlen(resp) + lSize + 1);
+    if (!*resp_buffer) {
+        free(ico_content);
+        perror("memory alloc fails");
+        return -1;
+    }
+    i32 total_size = strlen(resp) + lSize;
+    memcpy(*resp_buffer, resp, strlen(resp));
+    memcpy(*resp_buffer + strlen(resp), ico_content, lSize);
+    free(ico_content);
+
+    return total_size;
+}
+
 i32 not_found_endpoint(char **resp_buffer) {
     char *html_content;
     i32 lSize = read_file_in(&html_content, "./pages/404.html");
@@ -433,7 +450,7 @@ int main() {
     printf("server listening for connectons...\n");
     char read_buffer[BUFFER_SIZE];
 
-    u8 endpoint_count = 4;
+    u8 endpoint_count = 5;
     endpoint_mapping endpoints[endpoint_count];
     endpoints[0] = (endpoint_mapping){.endpoint = "/posts/recent/",
                                       .func = recent_post_endpoint,
@@ -445,6 +462,8 @@ int main() {
         (endpoint_mapping){.endpoint = "/home/", .func = index_endpoint};
     endpoints[3] =
         (endpoint_mapping){.endpoint = "/rss.xml", .func = rss_endpoint};
+    endpoints[4] =
+        (endpoint_mapping){.endpoint = "/favicon.ico", .func = ico_endpoint};
 
     i32 (*nf_endpoint)(char **) = not_found_endpoint;
 

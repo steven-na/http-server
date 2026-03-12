@@ -14,6 +14,8 @@ services:
       - ./posts:/app/posts
       - ./pages:/app/pages
       - ./templates:/app/templates
+      - ./feed.xml:/app/feed.xml
+      - ./favicon.ico:/app/favicon.ico
     restart: unless-stopped
   website-caddy:
     container_name: website-caddy
