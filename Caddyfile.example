@@ -1,10 +1,10 @@
 # Local development
 localhost {
     tls internal
-    reverse_proxy server:80
+    reverse_proxy website-server:7001
 }
 
 # Production
 example.com {
-    reverse_proxy server:80
+    reverse_proxy website-server:7001
 }
