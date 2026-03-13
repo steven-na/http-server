@@ -12,6 +12,7 @@ services:
       - "7001:7001"
     volumes:
       - ./posts:/app/posts
+      - ./images:/app/images
       - ./pages:/app/pages
       - ./templates:/app/templates
       - ./feed.xml:/app/feed.xml

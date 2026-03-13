@@ -51,7 +51,7 @@ i32 replace_text(char **haystack, const char *needle, const char *replace) {
     size_t haystackLen = strlen(*haystack);
     char *pos = strstr(*haystack, needle);
     if (!pos) {
-        return 0;
+        return strlen(*haystack) + 1;
     }
     i32 offset = pos - *haystack;
     size_t ndlLen = strlen(needle);
@@ -77,7 +77,7 @@ i32 replace_all_text(char **haystack, const char *needle, const char *replace) {
     for (;;) {
         char *pos = strstr(*haystack, needle);
         if (!pos)
-            return 0;
+            break;
 
         i32 offset = pos - *haystack;
         size_t ndlLen = strlen(needle);
@@ -87,7 +87,7 @@ i32 replace_all_text(char **haystack, const char *needle, const char *replace) {
         if (repLen > ndlLen) {
             char *tmp = realloc(*haystack, haystackLen + (repLen - ndlLen) + 1);
             if (!tmp)
-                return -1;
+                return 0;
             *haystack = tmp;
         }
 
@@ -338,7 +338,7 @@ i32 index_endpoint(char **resp_buffer, char *params) {
 
     i32 result = build_response(resp_buffer, html_content, lSize);
     if (result == -1) {
-        return -1;
+        return 0;
     }
     return result;
 }
@@ -388,6 +388,53 @@ i32 ico_endpoint(char **resp_buffer, char *params) {
     memcpy(*resp_buffer, resp, strlen(resp));
     memcpy(*resp_buffer + strlen(resp), ico_content, lSize);
     free(ico_content);
+
+    return total_size;
+}
+
+i32 image_endpoint(char **resp_buffer, char *params) {
+    char *image_content;
+    if (strstr(params, "..")) {
+        return 0;
+    }
+    char *filepath;
+    asprintf(&filepath, "./images/%s", params);
+    i32 lSize = read_file_in(&image_content, filepath);
+    if (lSize == -1) {
+        perror("file read");
+        return 0;
+    }
+
+    char *filetype = NULL;
+    for (int i = strlen(params); i > 0; i--) {
+        if (*(params + i) == '.') {
+            if (i == strlen(params)) {
+                perror("filename ends with \".\"");
+                return 0;
+            }
+            filetype = params + i + 1;
+            break;
+        }
+    }
+    if (!filetype) {
+        perror("image has no filetype");
+        return 0;
+    }
+
+    char *resp;
+    asprintf(&resp, "HTTP/1.0 200 OK\r\nContent-type: image/%s\r\n\r\n",
+             filetype);
+
+    *resp_buffer = calloc(1, strlen(resp) + lSize + 1);
+    if (!*resp_buffer) {
+        free(image_content);
+        perror("memory alloc fails");
+        return -1;
+    }
+    i32 total_size = strlen(resp) + lSize;
+    memcpy(*resp_buffer, resp, strlen(resp));
+    memcpy(*resp_buffer + strlen(resp), image_content, lSize);
+    free(image_content);
 
     return total_size;
 }
@@ -450,7 +497,7 @@ int main() {
     printf("server listening for connectons...\n");
     char read_buffer[BUFFER_SIZE];
 
-    u8 endpoint_count = 5;
+    u8 endpoint_count = 6;
     endpoint_mapping endpoints[endpoint_count];
     endpoints[0] = (endpoint_mapping){.endpoint = "/posts/recent/",
                                       .func = recent_post_endpoint,
@@ -464,6 +511,8 @@ int main() {
         (endpoint_mapping){.endpoint = "/rss.xml", .func = rss_endpoint};
     endpoints[4] =
         (endpoint_mapping){.endpoint = "/favicon.ico", .func = ico_endpoint};
+    endpoints[5] = (endpoint_mapping){
+        .endpoint = "/images/", .func = image_endpoint, .is_prefix = true};
 
     i32 (*nf_endpoint)(char **) = not_found_endpoint;
 
