@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 typedef int8_t i8;
@@ -238,7 +239,6 @@ i32 specific_post_endpoint(char **resp_buffer, char *params) {
         return 0;
     }
 
-    printf("val: %i %i\n", post_index, post_count);
     if (post_index > 0) {
         const post *prev_post = &posts_list[post_index - 1];
         lSize = replace_text(&html_content, "<!-- PREVIOUS POST TITLE -->",
@@ -420,10 +420,18 @@ i32 image_endpoint(char **resp_buffer, char *params) {
         perror("image has no filetype");
         return 0;
     }
+    if (strcmp(filetype, "jpeg") == 0 || strcmp(filetype, "jfif") == 0 ||
+        strcmp(filetype, "jpe") == 0) {
+        filetype = "jpeg";
+    }
 
-    char *resp;
+    char *resp = NULL;
     asprintf(&resp, "HTTP/1.0 200 OK\r\nContent-type: image/%s\r\n\r\n",
              filetype);
+    if (!resp) {
+        perror("error building image response header");
+        return 0;
+    }
 
     *resp_buffer = calloc(1, strlen(resp) + lSize + 1);
     if (!*resp_buffer) {
@@ -542,6 +550,8 @@ int main() {
         char *endpoint_resp;
         i32 resp_len = 0;
         i32 should_free = 0;
+        double end, start;
+        start = clock();
 
         if (strcmp(uri, "/") == 0) {
             endpoint_resp = "HTTP/1.0 301 Moved Permanently\r\n"
@@ -577,11 +587,14 @@ int main() {
             continue;
         }
 
+        end = clock();
+        printf("[%s:%u] Server time to respond: %f seconds\n",
+               inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port),
+               (end - start) / CLOCKS_PER_SEC);
+
         if (should_free) {
             free(endpoint_resp);
         }
-
-        printf("server accepted connection\n");
 
         close(newsockfd);
     }
